@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"strconv"
 	"strings"
 )
 
@@ -152,15 +153,7 @@ func (that *HttpProxy) HttpResponse() {
 		}
 	}
 
-	// 发送响应头
-	headerStr := ""
-	for headerName, headerValues := range that.ResponseHeader {
-		for _, headerValue := range headerValues {
-			headerStr += headerName + ": " + headerValue + "\r\n"
-		}
-	}
-	headerStr += "\r\n"
-	_, _ = that.ClientConn.Write([]byte(headerStr))
+	/*暂时不发送响应头, 因为如果修改了响应体的话可能需要修改响应头*/
 
 	// 处理响应体
 	gzip := false
@@ -192,7 +185,6 @@ func (that *HttpProxy) HttpResponse() {
 		}
 	}
 
-	// 发送响应体
 	if body != nil {
 		if gzip {
 			// 压缩 gzip
@@ -202,6 +194,26 @@ func (that *HttpProxy) HttpResponse() {
 				return
 			}
 		}
+		// 修改 Content-Length
+		if values, exist := that.ResponseHeader["Content-Length"]; exist {
+			values = make([]string, 1)
+			values[0] = strconv.Itoa(len(body))
+			that.ResponseHeader["Content-Length"] = values
+		}
+	}
+
+	// 发送响应头
+	headerStr := ""
+	for headerName, headerValues := range that.ResponseHeader {
+		for _, headerValue := range headerValues {
+			headerStr += headerName + ": " + headerValue + "\r\n"
+		}
+	}
+	headerStr += "\r\n"
+	_, _ = that.ClientConn.Write([]byte(headerStr))
+
+	// 发送响应体
+	if body != nil {
 		_, _ = that.ClientConn.Write(body)
 	} else {
 		buf := make([]byte, 64*1024)
