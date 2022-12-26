@@ -12,5 +12,5 @@ var (
 
 func init() {
 	Handle = append(Handle, &baidu.Home{})
-	Handle = append(Handle, &lhb13520.Home{})
+	Handle = append(Handle, &lhb13520.All{})
 }

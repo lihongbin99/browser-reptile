@@ -13,6 +13,7 @@ func (that *Default) RequestNeedParseHeader(proxy *proxy.HttpProxy) bool {
 }
 
 func (that *Default) RequestParseHeader(proxy *proxy.HttpProxy) {
+	//for headerName, headerValues := range proxy.RequestHeader { }
 }
 
 func (that *Default) RequestNeedParseBody(proxy *proxy.HttpProxy) bool {
@@ -28,6 +29,7 @@ func (that *Default) ResponseNeedParseHeader(proxy *proxy.HttpProxy) bool {
 }
 
 func (that *Default) ResponseParseHeader(proxy *proxy.HttpProxy) {
+	//for headerName, headerValues := range proxy.ResponseHeader { }
 }
 
 func (that *Default) ResponseNeedParseBody(proxy *proxy.HttpProxy) bool {
