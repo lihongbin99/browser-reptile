@@ -92,17 +92,43 @@ func (that *HttpProxy) HttpRequest() {
 		headerStr += "\r\n"
 		_, _ = that.ServerConn.Write([]byte(headerStr))
 
-		// TODO 暂时未分析 Post 请求
-		if that.RequestMethod == "GET" && that.RequestProtocol == "HTTP/1.1" {
-			if connectionHeader, ok := that.RequestHeader["Connection"]; ok {
-				if connectionHeader[0] == "keep-alive" {
-					continue
+		// 处理 HTTP1.1 的长连接情况
+		keepAliveAndContentLength := false
+		contentLength := 0
+		keepAliveAndTransferEncoding := ""
+		if that.RequestProtocol == "HTTP/1.1" {
+			if contentLengthHeader, ok := that.RequestHeader["Content-Length"]; ok {
+				var err error = nil
+				if contentLength, err = strconv.Atoi(contentLengthHeader[0]); err == nil {
+					keepAliveAndContentLength = true
 				}
+			}
+			if contentLengthHeader, ok := that.RequestHeader["Transfer-Encoding"]; ok {
+				keepAliveAndTransferEncoding = contentLengthHeader[0]
 			}
 		}
 
-		// 处理请求体
+		if that.RequestMethod == "GET" || that.RequestMethod == "OPTIONS" {
+			continue
+		}
+		if keepAliveAndTransferEncoding != "" && !keepAliveAndContentLength {
+			fmt.Println("在", that.Host, that.RequestPath, "中出现了Transfer-Encoding:", keepAliveAndTransferEncoding)
+		}
+
+		// 获取请求体
 		var body []byte = nil
+		if keepAliveAndContentLength {
+			body = make([]byte, contentLength)
+			fmt.Println("开始读取post", that.Host, that.RequestPath, contentLength)
+			if err := utils.ReadN(that.ClientConn, body, contentLength); err != nil {
+				_ = that.ClientConn.Close()
+				_ = that.ServerConn.Close()
+				return
+			}
+		}
+		fmt.Println("post读取完成", that.Host, that.RequestPath, len(body))
+
+		// 处理请求体
 		for _, handle := range that.Handles {
 			if handle.RequestNeedParseBody(that) {
 				if body == nil {
@@ -190,16 +216,14 @@ func (that *HttpProxy) HttpResponse() {
 		contentLength := 0
 		keepAliveAndTransferEncoding := ""
 		if that.RequestProtocol == "HTTP/1.1" {
-			if connectionHeader, ok := that.ResponseHeader["Connection"]; ok && connectionHeader[0] == "keep-alive" {
-				if contentLengthHeader, ok := that.ResponseHeader["Content-Length"]; ok {
-					var err error = nil
-					if contentLength, err = strconv.Atoi(contentLengthHeader[0]); err == nil {
-						keepAliveAndContentLength = true
-					}
+			if contentLengthHeader, ok := that.ResponseHeader["Content-Length"]; ok {
+				var err error = nil
+				if contentLength, err = strconv.Atoi(contentLengthHeader[0]); err == nil {
+					keepAliveAndContentLength = true
 				}
-				if contentLengthHeader, ok := that.ResponseHeader["Transfer-Encoding"]; ok {
-					keepAliveAndTransferEncoding = contentLengthHeader[0]
-				}
+			}
+			if contentLengthHeader, ok := that.ResponseHeader["Transfer-Encoding"]; ok {
+				keepAliveAndTransferEncoding = contentLengthHeader[0]
 			}
 		}
 
