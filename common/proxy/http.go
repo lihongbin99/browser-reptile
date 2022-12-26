@@ -23,16 +23,17 @@ type HttpHandle interface {
 
 type HttpProxy struct {
 	*Proxy
-	RequestMethod   string
-	RequestPath     string
-	RequestProtocol string
-	// TODO 没有处理大小写问题
-	RequestHeader map[string][]string
+	RequestMethod    string
+	RequestPath      string
+	RequestProtocol  string
+	RequestHeader    map[string][]string
+	RequestSrcHeader map[string]string
 
 	ResponseProtocol    string
 	ResponseCode        string
 	ResponseCodeMessage string
 	ResponseHeader      map[string][]string
+	ResponseSrcHeader   map[string]string
 
 	Handles  []HttpHandle
 	waitChan chan uint8
@@ -41,8 +42,8 @@ type HttpProxy struct {
 func NewHttpProxy(socksProxy *Proxy, handles []HttpHandle, waitChan chan uint8) *HttpProxy {
 	return &HttpProxy{
 		socksProxy,
-		"", "", "", nil,
-		"", "", "", nil,
+		"", "", "", nil, nil,
+		"", "", "", nil, nil,
 		handles, waitChan,
 	}
 }
@@ -67,13 +68,14 @@ func (that *HttpProxy) HttpRequest() {
 		_, _ = that.ServerConn.Write([]byte(fmt.Sprintf("%s %s %s\r\n", that.RequestMethod, that.RequestPath, that.RequestProtocol)))
 
 		// 获取请求头
-		requestHeader := utils.HttpReadHeader(that.ClientConn)
+		requestHeader, requestSrcHeader := utils.HttpReadHeader(that.ClientConn)
 		if requestHeader == nil {
 			_ = that.ClientConn.Close()
 			_ = that.ServerConn.Close()
 			return
 		}
 		that.RequestHeader = requestHeader
+		that.RequestSrcHeader = requestSrcHeader
 
 		// 处理请求头
 		for _, handle := range that.Handles {
@@ -86,7 +88,7 @@ func (that *HttpProxy) HttpRequest() {
 		headerStr := ""
 		for headerName, headerValues := range that.RequestHeader {
 			for _, headerValue := range headerValues {
-				headerStr += headerName + ": " + headerValue + "\r\n"
+				headerStr += that.RequestSrcHeader[headerName] + ": " + headerValue + "\r\n"
 			}
 		}
 		headerStr += "\r\n"
@@ -97,13 +99,13 @@ func (that *HttpProxy) HttpRequest() {
 		contentLength := 0
 		keepAliveAndTransferEncoding := ""
 		if that.RequestProtocol == "HTTP/1.1" {
-			if contentLengthHeader, ok := that.RequestHeader["Content-Length"]; ok {
+			if contentLengthHeader, ok := that.RequestHeader["content-length"]; ok {
 				var err error = nil
 				if contentLength, err = strconv.Atoi(contentLengthHeader[0]); err == nil {
 					keepAliveAndContentLength = true
 				}
 			}
-			if contentLengthHeader, ok := that.RequestHeader["Transfer-Encoding"]; ok {
+			if contentLengthHeader, ok := that.RequestHeader["transfer-encoding"]; ok {
 				keepAliveAndTransferEncoding = contentLengthHeader[0]
 			}
 		}
@@ -119,14 +121,12 @@ func (that *HttpProxy) HttpRequest() {
 		var body []byte = nil
 		if keepAliveAndContentLength {
 			body = make([]byte, contentLength)
-			fmt.Println("开始读取post", that.Host, that.RequestPath, contentLength)
 			if err := utils.ReadN(that.ClientConn, body, contentLength); err != nil {
 				_ = that.ClientConn.Close()
 				_ = that.ServerConn.Close()
 				return
 			}
 		}
-		fmt.Println("post读取完成", that.Host, that.RequestPath, len(body))
 
 		// 处理请求体
 		for _, handle := range that.Handles {
@@ -185,11 +185,12 @@ func (that *HttpProxy) HttpResponse() {
 		_, _ = that.ClientConn.Write([]byte(fmt.Sprintf("%s %s %s\r\n", that.ResponseProtocol, that.ResponseCode, that.ResponseCodeMessage)))
 
 		// 获取响应头
-		responseHeader := utils.HttpReadHeader(that.ServerConn)
+		responseHeader, responseSrcHeader := utils.HttpReadHeader(that.ServerConn)
 		if responseHeader == nil {
 			return
 		}
 		that.ResponseHeader = responseHeader
+		that.ResponseSrcHeader = responseSrcHeader
 
 		// 处理响应头
 		for _, handle := range that.Handles {
@@ -202,7 +203,7 @@ func (that *HttpProxy) HttpResponse() {
 
 		// 获取响应体参数
 		gzip := false
-		if values, exist := that.ResponseHeader["Content-Encoding"]; exist {
+		if values, exist := that.ResponseHeader["content-encoding"]; exist {
 			for _, value := range values {
 				if strings.Contains(value, "gzip") {
 					gzip = true
@@ -216,13 +217,13 @@ func (that *HttpProxy) HttpResponse() {
 		contentLength := 0
 		keepAliveAndTransferEncoding := ""
 		if that.RequestProtocol == "HTTP/1.1" {
-			if contentLengthHeader, ok := that.ResponseHeader["Content-Length"]; ok {
+			if contentLengthHeader, ok := that.ResponseHeader["content-length"]; ok {
 				var err error = nil
 				if contentLength, err = strconv.Atoi(contentLengthHeader[0]); err == nil {
 					keepAliveAndContentLength = true
 				}
 			}
-			if contentLengthHeader, ok := that.ResponseHeader["Transfer-Encoding"]; ok {
+			if contentLengthHeader, ok := that.ResponseHeader["transfer-encoding"]; ok {
 				keepAliveAndTransferEncoding = contentLengthHeader[0]
 			}
 		}
@@ -295,10 +296,10 @@ func (that *HttpProxy) HttpResponse() {
 				}
 			}
 			// 修改 Content-Length
-			if values, exist := that.ResponseHeader["Content-Length"]; exist {
+			if values, exist := that.ResponseHeader["content-length"]; exist {
 				values = make([]string, 1)
 				values[0] = strconv.Itoa(len(body))
-				that.ResponseHeader["Content-Length"] = values
+				that.ResponseHeader["content-length"] = values
 			}
 		}
 
@@ -306,7 +307,7 @@ func (that *HttpProxy) HttpResponse() {
 		headerStr := ""
 		for headerName, headerValues := range that.ResponseHeader {
 			for _, headerValue := range headerValues {
-				headerStr += headerName + ": " + headerValue + "\r\n"
+				headerStr += that.ResponseSrcHeader[headerName] + ": " + headerValue + "\r\n"
 			}
 		}
 		headerStr += "\r\n"

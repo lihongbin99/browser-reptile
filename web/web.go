@@ -17,7 +17,7 @@ func Main(conn net.Conn) {
 		return
 	}
 
-	headers := utils.HttpReadHeader(conn)
+	headers, headerSrcs := utils.HttpReadHeader(conn)
 	if headers == nil {
 		return
 	}
@@ -31,14 +31,14 @@ func Main(conn net.Conn) {
 		}
 	}
 
-	doMain(conn, method, path, protocol, headers, data)
+	doMain(conn, method, path, protocol, headers, headerSrcs, data)
 }
 
 var (
 	cerBuf []byte = nil
 )
 
-func doMain(conn net.Conn, method, path, protocol string, headers map[string][]string, data []byte) {
+func doMain(conn net.Conn, method, path, protocol string, headers map[string][]string, headerSrcs map[string]string, data []byte) {
 	if path == "/proxy.cer" {
 		// 获取数据
 		if cerBuf == nil {

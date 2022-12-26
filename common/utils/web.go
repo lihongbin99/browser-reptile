@@ -34,13 +34,13 @@ func HttpReadProtocol(conn net.Conn) (err bool, s1, s2, s3 string) {
 	return true, "", "", ""
 }
 
-func HttpReadHeader(conn net.Conn) map[string][]string {
+func HttpReadHeader(conn net.Conn) (map[string][]string, map[string]string) {
 	buf := make([]byte, 1)
 	data := make([]byte, 0, 64*1024)
 	for {
 		readLen, err := conn.Read(buf[0:1])
 		if (err != nil && err != io.EOF) || readLen <= 0 {
-			return nil
+			return nil, nil
 		}
 		data = append(data, buf[0])
 		if len(data) >= 4 {
@@ -49,12 +49,13 @@ func HttpReadHeader(conn net.Conn) map[string][]string {
 			}
 		}
 		if err == io.EOF {
-			return nil
+			return nil, nil
 		}
 	}
 
 	// 解析请求头
 	headers := make(map[string][]string)
+	headerSrcs := make(map[string]string)
 	headerLine := strings.Split(string(data), "\r\n")
 	for _, str := range headerLine {
 		if str != "" {
@@ -63,17 +64,21 @@ func HttpReadHeader(conn net.Conn) map[string][]string {
 			if headerIndex >= 0 {
 				headerName := str[:headerIndex]
 				headerValue := str[headerIndex+2:]
-				if values, ok := headers[headerName]; ok {
-					headers[headerName] = append(values, headerValue)
+
+				headerLowName := strings.ToLower(headerName)
+				headerSrcs[headerLowName] = headerName
+
+				if values, ok := headers[headerLowName]; ok {
+					headers[headerLowName] = append(values, headerValue)
 				} else {
 					values = make([]string, 1)
 					values[0] = headerValue
-					headers[headerName] = values
+					headers[headerLowName] = values
 				}
 			}
 		}
 	}
-	return headers
+	return headers, headerSrcs
 }
 
 func HttpChunked(conn net.Conn) ([]byte, error) {
