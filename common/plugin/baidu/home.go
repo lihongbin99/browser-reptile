@@ -8,7 +8,7 @@ import (
 type Home struct{}
 
 func (that *Home) NeedParse(host string, port uint16) bool {
-	return strings.HasSuffix(host, "www.baidu.com")
+	return strings.HasSuffix(host, "baidu.com")
 }
 
 func (that *Home) RequestNeedParseHeader(proxy *proxy.HttpProxy) bool {

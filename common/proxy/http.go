@@ -58,6 +58,8 @@ func (that *HttpProxy) HttpRequest() {
 		protocolErr := true
 		protocolErr, that.RequestMethod, that.RequestPath, that.RequestProtocol = utils.HttpReadProtocol(that.ClientConn)
 		if protocolErr {
+			_ = that.ClientConn.Close()
+			_ = that.ServerConn.Close()
 			return
 		}
 
@@ -67,6 +69,8 @@ func (that *HttpProxy) HttpRequest() {
 		// 获取请求头
 		requestHeader := utils.HttpReadHeader(that.ClientConn)
 		if requestHeader == nil {
+			_ = that.ClientConn.Close()
+			_ = that.ServerConn.Close()
 			return
 		}
 		that.RequestHeader = requestHeader
@@ -105,6 +109,8 @@ func (that *HttpProxy) HttpRequest() {
 					var err error = nil
 					body, err = ioutil.ReadAll(that.ClientConn)
 					if err != nil {
+						_ = that.ClientConn.Close()
+						_ = that.ServerConn.Close()
 						return
 					}
 				}

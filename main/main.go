@@ -62,7 +62,6 @@ func doMain(conn net.Conn) {
 	waitChan := make(chan uint8)
 	if socksProxy.NeedParse {
 		httpProxy := proxy.NewHttpProxy(socksProxy, plugin.Handle, waitChan)
-		// TODO HTTP1.1 的长连接情况下未关流
 		go httpProxy.HttpRequest()
 		go httpProxy.HttpResponse()
 	} else {
