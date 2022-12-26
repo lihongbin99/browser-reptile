@@ -9,14 +9,14 @@ func (that *Default) NeedParse(host string, port uint16) bool {
 }
 
 func (that *Default) RequestNeedParseHeader(proxy *proxy.HttpProxy) bool {
-	return false
+	return false && that.NeedParse(proxy.Host, proxy.Port)
 }
 
 func (that *Default) RequestParseHeader(proxy *proxy.HttpProxy) {
 }
 
 func (that *Default) RequestNeedParseBody(proxy *proxy.HttpProxy) bool {
-	return false
+	return false && that.NeedParse(proxy.Host, proxy.Port)
 }
 
 func (that *Default) RequestParseBody(proxy *proxy.HttpProxy, body []byte) []byte {
@@ -24,14 +24,14 @@ func (that *Default) RequestParseBody(proxy *proxy.HttpProxy, body []byte) []byt
 }
 
 func (that *Default) ResponseNeedParseHeader(proxy *proxy.HttpProxy) bool {
-	return false
+	return false && that.NeedParse(proxy.Host, proxy.Port)
 }
 
 func (that *Default) ResponseParseHeader(proxy *proxy.HttpProxy) {
 }
 
 func (that *Default) ResponseNeedParseBody(proxy *proxy.HttpProxy) bool {
-	return false
+	return false && that.NeedParse(proxy.Host, proxy.Port)
 }
 
 func (that *Default) ResponseParseBody(proxy *proxy.HttpProxy, body []byte) []byte {

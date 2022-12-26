@@ -2,7 +2,7 @@ package plugin
 
 import (
 	"browser-reptile/common/plugin/baidu"
-	"browser-reptile/common/plugin/base"
+	"browser-reptile/common/plugin/lhb13520"
 	"browser-reptile/common/proxy"
 )
 
@@ -11,6 +11,6 @@ var (
 )
 
 func init() {
-	Handle = append(Handle, &base.Base{})
 	Handle = append(Handle, &baidu.Home{})
+	Handle = append(Handle, &lhb13520.Home{})
 }

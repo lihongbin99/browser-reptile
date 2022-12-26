@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	"io"
+	"net"
 )
 
 type GzipChunkedReader struct {
@@ -28,4 +29,16 @@ func (that *GzipChunkedReader) Read(buf []byte) (n int, err error) {
 	that.skip += length
 
 	return length, nil
+}
+
+func ReadN(conn net.Conn, buf []byte, len int) error {
+	readLen := 0
+	for len-readLen > 0 {
+		n, err := conn.Read(buf[readLen:len])
+		if err != nil {
+			return err
+		}
+		readLen += n
+	}
+	return nil
 }
