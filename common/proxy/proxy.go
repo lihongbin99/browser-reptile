@@ -1,7 +1,8 @@
 package proxy
 
 import (
-	"fmt"
+	"browser-reptile/common/config"
+	"browser-reptile/common/utils"
 	"io"
 	"net"
 )
@@ -13,18 +14,10 @@ type Proxy struct {
 	Host string
 	Port uint16
 
-	NeedParse bool
+	NeedParseHttp bool
 }
 
-func Transfer(r net.Conn, w net.Conn, waitChan chan uint8) {
-	transfer(r, w, waitChan, false)
-}
-
-func TransferShowContent(r net.Conn, w net.Conn, waitChan chan uint8) {
-	transfer(r, w, waitChan, true)
-}
-
-func transfer(r net.Conn, w net.Conn, waitChan chan uint8, flag bool) {
+func Transfer(sockId int, r net.Conn, w net.Conn, waitChan chan uint8, isTo bool) {
 	defer func() {
 		_ = r.Close()
 		_ = w.Close()
@@ -36,8 +29,10 @@ func transfer(r net.Conn, w net.Conn, waitChan chan uint8, flag bool) {
 		if (err != nil && err != io.EOF) || readLen <= 0 {
 			return
 		}
-		if flag {
-			fmt.Printf("proxy: %s\n", string(buf[:readLen]))
+
+		// 保存数据
+		if config.CommonConfig.LogTo != config.LogToNull {
+			utils.SaveData(sockId, buf[:readLen], isTo)
 		}
 
 		if _, err = w.Write(buf[:readLen]); err != nil {

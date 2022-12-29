@@ -28,10 +28,6 @@ func init() {
 	}
 	localhostAddressMap["127.0.0.1"] = 127
 	localhostAddressMap["localhost"] = 127
-
-	for address, _ := range localhostAddressMap {
-		fmt.Println("loop back:", address)
-	}
 }
 
 func Parse(conn net.Conn, buf []byte) (*proxy.Proxy, bool, error) {
@@ -106,17 +102,25 @@ func step2(conn net.Conn, buf []byte) (*proxy.Proxy, bool, error) {
 	}
 
 	// 判断是否需要解析 http
-	needParse := false
-	for _, handle := range plugin.Handle {
-		if handle.NeedParse(host, port) {
-			needParse = true
-			break
+	needParseHttp := false
+	if config.CommonConfig.ParseHTTP {
+		// 如果是443端口则必须解析tls的情况下才能解析http
+		if port != 443 || config.CommonConfig.ParseTLS {
+			for _, handle := range plugin.Handle {
+				if handle.NeedParse(host, port) {
+					needParseHttp = true
+					break
+				}
+			}
 		}
 	}
 
 	// 连接服务器
+	clientConn := conn
 	var serverConn net.Conn = nil
-	if needParse && port == 443 {
+	if port == 443 && config.CommonConfig.ParseTLS {
+		//clientConn, serverConn, err = mtls.InitTLS(conn, fmt.Sprintf("%s:%d", host, port))
+		clientConn = tls.Server(conn, config.TlsConfig)
 		serverConn, err = tls.Dial("tcp", fmt.Sprintf("%s:%d", host, port), &tls.Config{InsecureSkipVerify: true})
 		if err != nil {
 			buf[1] = 3
@@ -143,16 +147,12 @@ func step2(conn net.Conn, buf []byte) (*proxy.Proxy, bool, error) {
 	buf[1] = 0
 	_, _ = conn.Write(buf[:readLen])
 
-	clientConn := conn
-	if needParse && port == 443 {
-		clientConn = tls.Server(conn, config.TlsConfig)
-	}
 	result := &proxy.Proxy{
-		ClientConn: clientConn,
-		ServerConn: serverConn,
-		Host:       host,
-		Port:       port,
-		NeedParse:  needParse,
+		ClientConn:    clientConn,
+		ServerConn:    serverConn,
+		Host:          host,
+		Port:          port,
+		NeedParseHttp: needParseHttp,
 	}
 	return result, false, nil
 }

@@ -9,9 +9,16 @@ import (
 	"browser-reptile/web"
 	"fmt"
 	"net"
+	"sync"
+)
+
+var (
+	id     = 0
+	idLock = sync.Mutex{}
 )
 
 func main() {
+
 	listenAddr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf(":%d", config.ListenPort))
 	if err != nil {
 		panic(err)
@@ -25,6 +32,7 @@ func main() {
 	fmt.Println("start success")
 	for {
 		conn, err := listener.AcceptTCP()
+
 		if err != nil {
 			if err != nil {
 				panic(err)
@@ -39,6 +47,8 @@ func doMain(conn net.Conn) {
 	defer func() {
 		_ = conn.Close()
 	}()
+
+	sockId := getId()
 
 	buf := make([]byte, 64*1024)
 
@@ -60,15 +70,22 @@ func doMain(conn net.Conn) {
 	//fmt.Printf("socks proxy %s:%d success\n", socksProxy.Host, socksProxy.Port)
 
 	waitChan := make(chan uint8)
-	if socksProxy.NeedParse {
+	if socksProxy.NeedParseHttp {
 		httpProxy := proxy.NewHttpProxy(socksProxy, plugin.Handle, waitChan)
 		go httpProxy.HttpRequest()
 		go httpProxy.HttpResponse()
 	} else {
-		go proxy.Transfer(socksProxy.ClientConn, socksProxy.ServerConn, waitChan)
-		go proxy.Transfer(socksProxy.ServerConn, socksProxy.ClientConn, waitChan)
+		go proxy.Transfer(sockId, socksProxy.ClientConn, socksProxy.ServerConn, waitChan, true)
+		go proxy.Transfer(sockId, socksProxy.ServerConn, socksProxy.ClientConn, waitChan, false)
 	}
 
 	_ = <-waitChan
 	_ = <-waitChan
+}
+
+func getId() int {
+	idLock.Lock()
+	defer idLock.Unlock()
+	id++
+	return id
 }
