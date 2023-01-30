@@ -29,7 +29,7 @@ func Tls(clientConn, serverConn net.Conn, hostname string) (net.Conn, net.Conn, 
 	}
 
 	if buf[0] != 22 {
-		return nil, nil, nil
+		return clientPeepConn, serverConn, nil
 	}
 
 	// 偷窥 ClientHello
